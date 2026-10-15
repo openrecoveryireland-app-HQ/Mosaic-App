@@ -1,14 +1,17 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Notifications from "expo-notifications";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import Constants, { ExecutionEnvironment } from "expo-constants";
+import type * as NotificationsModule from "expo-notifications";
 import { useEffect, useState } from "react";
 import {
-    Alert,
-    ImageBackground,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  ImageBackground,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type MedReminder = {
@@ -36,7 +39,17 @@ const PUBLIC_MESSAGE_OPTIONS = [
   "Your calendar is getting excited",
 ];
 
-Notifications.setNotificationHandler({
+// expo-notifications throws on import inside Expo Go on Android (SDK 53+),
+// so only load it when running in a development or production build.
+const notificationsUnavailable =
+  Platform.OS === "android" &&
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+const Notifications: typeof NotificationsModule | null =
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  notificationsUnavailable ? null : require("expo-notifications");
+
+Notifications?.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
@@ -44,6 +57,34 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
+
+async function scheduleDailyReminder(
+  reminderId: string,
+  alarmTime: string,
+  publicMessage: string
+) {
+  if (!Notifications) throw new Error("Notifications unavailable");
+
+  const [hour, minute] = alarmTime.split(":").map(Number);
+
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Mosaic",
+      body: publicMessage,
+      sound: "default",
+      data: {
+        screen: "MedsReminder",
+        reminderId,
+      },
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DAILY,
+      hour,
+      minute,
+      channelId: CHANNEL_ID,
+    },
+  });
+}
 
 function cleanTime(time: string) {
   return time.trim();
@@ -101,6 +142,7 @@ function getReminderLabel(minutes: number) {
 export default function MedsReminder() {
   const [medicineName, setMedicineName] = useState("");
   const [time, setTime] = useState("");
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [remindBefore, setRemindBefore] = useState(0);
   const [publicMessage, setPublicMessage] = useState(DEFAULT_PUBLIC_MESSAGE);
   const [reminders, setReminders] = useState<MedReminder[]>([]);
@@ -109,20 +151,41 @@ export default function MedsReminder() {
     ? getReminderTime(time, remindBefore).display
     : "";
 
-  useEffect(() => {
-    setupNotifications();
-    loadReminders();
-  }, []);
+  function pickerValue() {
+    const date = new Date();
 
-  async function setupNotifications() {
-    const permission = await Notifications.requestPermissionsAsync();
+    if (validTime(time)) {
+      const [hour, minute] = cleanTime(time).split(":").map(Number);
+      date.setHours(hour, minute, 0, 0);
+    }
+
+    return date;
+  }
+
+  function onTimeChange(_event: unknown, date: Date) {
+    // Android shows a dialog that closes itself; iOS shows an inline spinner.
+    if (Platform.OS === "android") setShowTimePicker(false);
+
+    setTime(formatTime(date.getHours(), date.getMinutes()));
+  }
+
+  // Asks for permission if needed and makes sure the Android channel exists.
+  // Returns false when reminders can't be delivered.
+  async function ensureNotificationsReady() {
+    if (!Notifications) return false;
+
+    let permission = await Notifications.getPermissionsAsync();
+
+    if (!permission.granted && permission.canAskAgain) {
+      permission = await Notifications.requestPermissionsAsync();
+    }
 
     if (!permission.granted) {
       Alert.alert(
         "Notifications Off",
-        "Notifications are not enabled, so reminders may not appear."
+        "Turn on notifications for Mosaic in your phone settings so reminders can appear."
       );
-      return;
+      return false;
     }
 
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
@@ -130,15 +193,17 @@ export default function MedsReminder() {
       importance: Notifications.AndroidImportance.HIGH,
       sound: "default",
     });
+
+    return true;
   }
 
-  async function loadReminders() {
+  async function loadReminders(notificationsReady: boolean) {
     const saved = await AsyncStorage.getItem(STORAGE_KEY);
 
     if (saved) {
       const parsedReminders: MedReminder[] = JSON.parse(saved);
 
-      const cleanedReminders = parsedReminders.map((reminder) => {
+      let cleanedReminders = parsedReminders.map((reminder) => {
         const alarmTime =
           reminder.alarmTime ||
           getReminderTime(reminder.time, reminder.remindBefore).display;
@@ -149,6 +214,28 @@ export default function MedsReminder() {
           publicMessage: reminder.publicMessage || DEFAULT_PUBLIC_MESSAGE,
         };
       });
+
+      // Re-create any daily notification the phone no longer has scheduled
+      // (e.g. after reinstalling or restoring the app), so every saved
+      // reminder keeps firing each day.
+      if (Notifications && notificationsReady) {
+        const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+        const scheduledIds = new Set(scheduled.map((item) => item.identifier));
+
+        cleanedReminders = await Promise.all(
+          cleanedReminders.map(async (reminder) => {
+            if (scheduledIds.has(reminder.notificationId)) return reminder;
+
+            const notificationId = await scheduleDailyReminder(
+              reminder.id,
+              reminder.alarmTime,
+              reminder.publicMessage
+            );
+
+            return { ...reminder, notificationId };
+          })
+        );
+      }
 
       setReminders(cleanedReminders);
       await AsyncStorage.setItem(
@@ -163,6 +250,10 @@ export default function MedsReminder() {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedReminders));
   }
 
+  useEffect(() => {
+    ensureNotificationsReady().then(loadReminders);
+  }, []);
+
   async function addReminder() {
     const cleanedName = medicineName.trim();
     const cleanedTime = cleanTime(time);
@@ -173,33 +264,38 @@ export default function MedsReminder() {
     }
 
     if (!validTime(cleanedTime)) {
+      Alert.alert("Missing time", "Pick a time for the reminder.");
+      return;
+    }
+
+    if (!Notifications) {
       Alert.alert(
-        "Wrong time format",
-        "Use 24-hour time format, for example 09:00, 15:00, or 21:30."
+        "Reminders unavailable",
+        "Reminders unavailable in test environment."
       );
       return;
     }
 
+    if (!(await ensureNotificationsReady())) return;
+
     const reminderTime = getReminderTime(cleanedTime, remindBefore);
     const id = Date.now().toString();
 
-    const notificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Mosaic",
-        body: publicMessage,
-        sound: "default",
-        data: {
-          screen: "MedsReminder",
-          reminderId: id,
-        },
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: reminderTime.hour,
-        minute: reminderTime.minute,
-        channelId: CHANNEL_ID,
-      } as any,
-    });
+    let notificationId: string;
+
+    try {
+      notificationId = await scheduleDailyReminder(
+        id,
+        reminderTime.display,
+        publicMessage
+      );
+    } catch {
+      Alert.alert(
+        "Reminder not saved",
+        "Something went wrong setting up the reminder. Please try again."
+      );
+      return;
+    }
 
     const newReminder: MedReminder = {
       id,
@@ -217,6 +313,7 @@ export default function MedsReminder() {
 
     setMedicineName("");
     setTime("");
+    setShowTimePicker(false);
     setRemindBefore(0);
     setPublicMessage(DEFAULT_PUBLIC_MESSAGE);
 
@@ -227,7 +324,7 @@ export default function MedsReminder() {
   }
 
   async function deleteReminder(reminder: MedReminder) {
-    await Notifications.cancelScheduledNotificationAsync(
+    await Notifications?.cancelScheduledNotificationAsync(
       reminder.notificationId
     );
 
@@ -382,37 +479,38 @@ export default function MedsReminder() {
             }}
           />
 
-          <TextInput
-            value={time}
-            onChangeText={setTime}
-            placeholder="Time, for example 21:30"
-            placeholderTextColor="#666666"
-            keyboardType="numbers-and-punctuation"
-            maxLength={5}
+          <TouchableOpacity
+            onPress={() => setShowTimePicker(!showTimePicker)}
             style={{
               backgroundColor: "#ffffff",
               borderWidth: 2,
               borderColor: "#2E7D6B",
               borderRadius: 18,
               padding: 14,
-              color: "#111111",
-              fontSize: 17,
-              marginBottom: 8,
-            }}
-          />
-
-          <Text
-            style={{
-              color: "#263238",
-              fontSize: 14,
-              lineHeight: 20,
               marginBottom: 16,
-              textAlign: "center",
-              fontWeight: "700",
             }}
           >
-            Use 24-hour time format, for example 09:00, 15:00, or 21:30.
-          </Text>
+            <Text
+              style={{
+                color: time === "" ? "#666666" : "#111111",
+                fontSize: 17,
+              }}
+            >
+              {time === "" ? "Pick a time" : `Time: ${time}`}
+            </Text>
+          </TouchableOpacity>
+
+          {showTimePicker && (
+            <DateTimePicker
+              value={pickerValue()}
+              mode="time"
+              is24Hour
+              locale="en-GB"
+              display={Platform.OS === "ios" ? "spinner" : "default"}
+              onValueChange={onTimeChange}
+              onDismiss={() => setShowTimePicker(false)}
+            />
+          )}
 
           <Text
             style={{
@@ -447,7 +545,7 @@ export default function MedsReminder() {
               textAlign: "center",
             }}
           >
-            Public phone message
+            Choose a reminder message
           </Text>
 
           <Text

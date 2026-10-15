@@ -76,22 +76,6 @@ export default function FloatingMenu() {
           <MenuItem label="Journal" onPress={() => goTo("/journal")} />
           <MenuItem label="Hold" onPress={() => goTo("/hold-the-line")} />
         </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back to the previous page"
-          accessibilityState={{ disabled: !router.canGoBack() }}
-          disabled={!router.canGoBack()}
-          onPress={() => navigate(() => router.back())}
-          style={[
-            styles.backArrowButton,
-            { bottom: insets.bottom + 20 },
-            !router.canGoBack() && styles.menuItemDisabled,
-          ]}
-        >
-          <Text style={styles.backArrowText}>‹</Text>
-          <Text style={styles.backLabel}>Back</Text>
-        </Pressable>
       </Animated.View>
 
       {!isOpen && (
@@ -209,28 +193,6 @@ const styles = StyleSheet.create({
   },
   menuItems: {
     marginTop: 12,
-  },
-  backArrowButton: {
-    position: "absolute",
-    left: 24,
-    minWidth: 76,
-    height: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-    borderRadius: 20,
-    backgroundColor: "rgba(18,60,105,0.08)",
-  },
-  backArrowText: {
-    color: "#123C69",
-    fontSize: 24,
-    lineHeight: 28,
-  },
-  backLabel: {
-    color: "#123C69",
-    fontSize: 13,
-    fontWeight: "800",
   },
   menuItem: {
     minHeight: 54,

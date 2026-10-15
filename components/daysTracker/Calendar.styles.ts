@@ -13,6 +13,8 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "visible",
+    // Lift the logo clear of the counter's purple pulse glow.
+    transform: [{ translateY: -24 }],
   },
   counterArea: {
     position: "relative",

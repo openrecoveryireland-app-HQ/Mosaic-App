@@ -51,6 +51,7 @@
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
+      "expo-notifications",
       "@react-native-community/datetimepicker"
     ],
     "experiments": {

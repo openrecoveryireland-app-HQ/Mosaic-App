@@ -304,20 +304,35 @@ export default function MemberStories() {
           ))}
         </View>
 
-        {/* ========== SHARE YOUR STORY ========== */}
+        {/* ========== SHARE YOUR STORY (coming soon) ========== */}
         <View
           style={{
-            backgroundColor: "rgba(255,255,255,0.9)",
+            backgroundColor: "rgba(235,235,235,0.9)",
             borderRadius: 26,
             padding: 18,
             borderWidth: 2,
-            borderColor: "#F2994A",
+            borderColor: "#B0B0B0",
             marginBottom: 20,
           }}
         >
+          <View
+            style={{
+              alignSelf: "center",
+              backgroundColor: "#8A8A8A",
+              borderRadius: 12,
+              paddingVertical: 4,
+              paddingHorizontal: 12,
+              marginBottom: 10,
+            }}
+          >
+            <Text style={{ color: "#ffffff", fontSize: 13, fontWeight: "900" }}>
+              COMING SOON
+            </Text>
+          </View>
+
           <Text
             style={{
-              color: "#123C69",
+              color: "#8A8A8A",
               fontSize: 24,
               fontWeight: "900",
               textAlign: "center",
@@ -329,7 +344,7 @@ export default function MemberStories() {
 
           <Text
             style={{
-              color: "#263238",
+              color: "#9E9E9E",
               fontSize: 16,
               lineHeight: 24,
               textAlign: "center",
@@ -342,33 +357,33 @@ export default function MemberStories() {
           </Text>
 
           <TouchableOpacity
-            onPress={uploadProfilePic}
+            disabled
             style={{
-              backgroundColor: "#ffffff",
+              backgroundColor: "#F2F2F2",
               borderWidth: 2,
-              borderColor: "#F2994A",
+              borderColor: "#C4C4C4",
               borderRadius: 22,
               paddingVertical: 15,
               alignItems: "center",
               marginBottom: 14,
             }}
           >
-            <Text style={{ color: "#123C69", fontSize: 17, fontWeight: "900" }}>
+            <Text style={{ color: "#9E9E9E", fontSize: 17, fontWeight: "900" }}>
               Optional Profile Picture
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => openLink(SUBMIT_STORY_PAGE)}
+            disabled
             style={{
-              backgroundColor: "#F2994A",
+              backgroundColor: "#C4C4C4",
               borderRadius: 22,
               paddingVertical: 15,
               alignItems: "center",
             }}
           >
             <Text style={{ color: "#ffffff", fontSize: 18, fontWeight: "900" }}>
-              Submit Your Story
+              Coming Soon
             </Text>
           </TouchableOpacity>
         </View>
