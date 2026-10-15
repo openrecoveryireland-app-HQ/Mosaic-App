@@ -1,29 +1,22 @@
-import { useMemo, useState } from "react";
-
-// Expo Router navigation
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-
-// React Native components
+import { useMemo, useState } from "react";
 import {
-  Image,
-  ImageBackground,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    ImageBackground,
+    ScrollView,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
-// Recovery messages
+import Counter from "../../components/daysTracker/Counter";
 import recoveryMessages from "../../constants/recovery/Messages";
-
-// Counter component
-import Counter from "../../components/Counter";
-
-// Home page styles
 import styles from "../../styles/homeStyles";
 
 export default function Index() {
   const [readButtonsAloud, setReadButtonsAloud] = useState(false);
+  const [whyExpanded, setWhyExpanded] = useState(false);
 
   const randomMessage = useMemo(() => {
     return recoveryMessages[Math.floor(Math.random() * recoveryMessages.length)];
@@ -215,44 +208,86 @@ export default function Index() {
           </Text>
         </TouchableOpacity>
 
-        <View
-          style={{
-            width: "100%",
-            backgroundColor: "rgba(255,255,255,0.78)",
-            borderRadius: 24,
-            paddingVertical: 22,
-            paddingHorizontal: 18,
-            borderWidth: 1,
-            borderColor: "rgba(18,60,105,0.25)",
-            marginTop: 34,
-          }}
-        >
-          <Text
+        {/* ========== Why Mosaic Exists – Compact Dropdown ========== */}
+        <View style={{ width: "100%", alignItems: "center", marginTop: 28 }}>
+          <View
             style={{
-              color: "#123C69",
-              fontSize: 22,
-              fontWeight: "900",
-              textAlign: "center",
-              marginBottom: 12,
+              flexDirection: "row",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: whyExpanded ? 10 : 0,
             }}
           >
-            Why Mosaic Exists
-          </Text>
+            <TouchableOpacity
+              onPress={() => setWhyExpanded(!whyExpanded)}
+              activeOpacity={0.7}
+              style={[
+                styles.smallFooterButton,
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  marginBottom: 0,
+                },
+              ]}
+            >
+              <Text style={styles.smallFooterButtonText}>Why Mosaic Exists</Text>
+              <Ionicons
+                name={whyExpanded ? "chevron-up" : "chevron-down"}
+                size={14}
+                color="#177F69"
+              />
+            </TouchableOpacity>
 
-          <Text
-            style={{
-              color: "#111111",
-              fontSize: 18,
-              lineHeight: 29,
-              textAlign: "center",
-            }}
-          >
-            Mosaic was built by someone in recovery, for people trying to take
-            the next step forward.
-            {"\n\n"}
-            Private. Non-judgemental. No public profile. No pressure.
-          </Text>
+            <TouchableOpacity
+              style={[
+                styles.smallFooterButton,
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  marginBottom: 0,
+                },
+              ]}
+              onPress={() => router.push("/faq")}
+              accessibilityRole="button"
+              accessibilityLabel="Frequently Asked Questions"
+            >
+              <Ionicons name="help-circle-outline" size={15} color="#177F69" />
+              <Text style={styles.smallFooterButtonText}>FAQ</Text>
+            </TouchableOpacity>
+          </View>
+
+          {whyExpanded && (
+            <View
+              style={{
+                width: "100%",
+                backgroundColor: "rgba(255,255,255,0.78)",
+                borderRadius: 16,
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                borderWidth: 1,
+                borderColor: "rgba(18,60,105,0.2)",
+              }}
+            >
+              <Text
+                style={{
+                  color: "#111111",
+                  fontSize: 15,
+                  lineHeight: 24,
+                  textAlign: "center",
+                }}
+              >
+                Mosaic was built by someone in recovery, for people trying to take
+                the next step forward.
+                {"\n\n"}
+                Private. Non-judgemental. No public profile. No pressure.
+              </Text>
+            </View>
+          )}
         </View>
+        {/* ========== End Dropdown ========== */}
 
         <Text
           style={[

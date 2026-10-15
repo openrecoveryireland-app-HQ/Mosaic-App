@@ -3,39 +3,26 @@ import {
   Dimensions,
   Image,
   PanResponder,
-  Pressable,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 
-const screen = Dimensions.get("window");
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
 const IMAGE_RATIO = 1792 / 1024;
+const BASE_H = SCREEN_H * 1.25;
+const BASE_W = BASE_H * IMAGE_RATIO;
 
-const OVERVIEW_WIDTH = screen.width;
-const OVERVIEW_HEIGHT = OVERVIEW_WIDTH / IMAGE_RATIO;
-const OVERVIEW_TOP = (screen.height - OVERVIEW_HEIGHT) / 2;
-
-const AIM_SCENE_HEIGHT = screen.height * 1.35;
-const AIM_SCENE_WIDTH = AIM_SCENE_HEIGHT * IMAGE_RATIO;
-
-const SCOPE_SIZE = Math.min(screen.width * 0.68, 260);
-
-const PINT_WIDTH = 40;
-const PINT_HEIGHT = 68;
-const OVERVIEW_PINT_WIDTH = 18;
-const OVERVIEW_PINT_HEIGHT = 31;
-
-const HIT_RADIUS = 48;
+const SCOPE_SIZE = Math.min(SCREEN_W * 0.66, 260);
+const PINT_W = 15;
+const PINT_H = 26;
+const HIT_RADIUS = 24;
 const PINT_COUNT = 12;
+const AIMED_ZOOM = 2.7;
 
-type Mode = "overview" | "aim" | "finished";
-
-type Point = {
-  x: number;
-  y: number;
-};
+type Mode = "overview" | "aimed";
 
 type Pint = {
   id: number;
@@ -44,586 +31,419 @@ type Pint = {
   hit: boolean;
 };
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
+const clamp = (v: number, min: number, max: number) =>
+  Math.min(Math.max(v, min), max);
 
 const makePints = (): Pint[] =>
-  Array.from({ length: PINT_COUNT }).map((_, index) => ({
-    id: index,
-
-    // Normalised positions across the panoramic picture.
-    // The vertical range keeps the pints around the town and foreground,
-    // rather than placing them high in the sky.
-    x: 0.04 + Math.random() * 0.92,
-    y: 0.43 + Math.random() * 0.38,
-
+  Array.from({ length: PINT_COUNT }, (_, i) => ({
+    id: i,
+    x: 0.05 + Math.random() * 0.90,
+    y: 0.50 + Math.random() * 0.38,
     hit: false,
   }));
 
 export default function OpenSeason() {
   const [mode, setMode] = useState<Mode>("overview");
-  const [score, setScore] = useState(0);
   const [pints, setPints] = useState<Pint[]>(makePints);
+  const [score, setScore] = useState(0);
+  const [finished, setFinished] = useState(false);
+  const [flash, setFlash] = useState(false);
+  const [, forceRender] = useState(0);
 
-  const [selectedPoint, setSelectedPoint] = useState<Point>({
-    x: 0.5,
-    y: 0.58,
+  // Keep zoom in a ref so pan logic never uses a stale value
+  const zoomRef = useRef(1);
+  const scene = useRef({
+    x: SCREEN_W / 2 - BASE_W / 2,
+    y: SCREEN_H / 2 - BASE_H * 0.60,
   });
 
-  const [scene, setScene] = useState<Point>({
-    x: screen.width / 2 - AIM_SCENE_WIDTH / 2,
-    y: screen.height / 2 - AIM_SCENE_HEIGHT * 0.58,
-  });
+  const dragStart = useRef({ x: 0, y: 0 });
+  const didDrag = useRef(false);
 
-  const sceneRef = useRef(scene);
-  const dragStartScene = useRef(scene);
-
-  const setSceneSafely = (nextScene: Point) => {
-    const correctedScene = {
-      x: clamp(nextScene.x, screen.width - AIM_SCENE_WIDTH, 0),
-      y: clamp(nextScene.y, screen.height - AIM_SCENE_HEIGHT, 0),
+  const getSize = () => {
+    const z = zoomRef.current;
+    return {
+      w: BASE_W * z,
+      h: BASE_H * z,
     };
-
-    sceneRef.current = correctedScene;
-    setScene(correctedScene);
   };
 
-  const enterAimMode = () => {
-    setSceneSafely({
-      x: screen.width / 2 - selectedPoint.x * AIM_SCENE_WIDTH,
-      y: screen.height / 2 - selectedPoint.y * AIM_SCENE_HEIGHT,
-    });
+  const updateScene = (x: number, y: number) => {
+    const { w, h } = getSize();
+    scene.current = {
+      x: clamp(x, SCREEN_W - w, 0),
+      y: clamp(y, SCREEN_H - h, 0),
+    };
+    forceRender((n) => n + 1);
+  };
 
-    setMode("aim");
+  const enterAimed = () => {
+    const centreX = (SCREEN_W / 2 - scene.current.x) / BASE_W;
+    const centreY = (SCREEN_H / 2 - scene.current.y) / BASE_H;
+
+    zoomRef.current = AIMED_ZOOM;
+    setMode("aimed");
+
+    const newW = BASE_W * AIMED_ZOOM;
+    const newH = BASE_H * AIMED_ZOOM;
+
+    scene.current = {
+      x: clamp(SCREEN_W / 2 - centreX * newW, SCREEN_W - newW, 0),
+      y: clamp(SCREEN_H / 2 - centreY * newH, SCREEN_H - newH, 0),
+    };
+    forceRender((n) => n + 1);
   };
 
   const returnToOverview = () => {
+    const { w, h } = getSize();
+    const centreX = (SCREEN_W / 2 - scene.current.x) / w;
+    const centreY = (SCREEN_H / 2 - scene.current.y) / h;
+
+    zoomRef.current = 1;
     setMode("overview");
-  };
 
-  const shoot = () => {
-    const aimX = (screen.width / 2 - sceneRef.current.x) / AIM_SCENE_WIDTH;
-    const aimY = (screen.height / 2 - sceneRef.current.y) / AIM_SCENE_HEIGHT;
-
-    const hit = pints.find((pint) => {
-      const horizontalDistance = (pint.x - aimX) * AIM_SCENE_WIDTH;
-      const verticalDistance = (pint.y - aimY) * AIM_SCENE_HEIGHT;
-
-      const distance = Math.sqrt(
-        horizontalDistance * horizontalDistance +
-          verticalDistance * verticalDistance
-      );
-
-      return distance < HIT_RADIUS;
-    });
-
-    if (!hit) {
-      return;
-    }
-
-    setPints((current) =>
-      current.map((pint) =>
-        pint.id === hit.id ? { ...pint, hit: true } : pint
-      )
-    );
-
-    setScore((current) => current + 1);
-
-    setTimeout(() => {
-      setPints((current) => {
-        const remaining = current.filter((pint) => pint.id !== hit.id);
-
-        if (remaining.length === 0) {
-          setMode("finished");
-        }
-
-        return remaining;
-      });
-    }, 500);
-  };
-
-  const restartGame = () => {
-    setScore(0);
-    setPints(makePints());
-    setSelectedPoint({
-      x: 0.5,
-      y: 0.58,
-    });
-    setMode("overview");
+    scene.current = {
+      x: clamp(SCREEN_W / 2 - centreX * BASE_W, SCREEN_W - BASE_W, 0),
+      y: clamp(SCREEN_H / 2 - centreY * BASE_H, SCREEN_H - BASE_H, 0),
+    };
+    forceRender((n) => n + 1);
   };
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-
-      onMoveShouldSetPanResponder: (_, gesture) =>
-        Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4,
 
       onPanResponderGrant: () => {
-        dragStartScene.current = sceneRef.current;
+        dragStart.current = { ...scene.current };
+        didDrag.current = false;
       },
 
-      onPanResponderMove: (_, gesture) => {
-        setSceneSafely({
-          x: dragStartScene.current.x + gesture.dx,
+      onPanResponderMove: (_, g) => {
+        if (Math.abs(g.dx) > 4 || Math.abs(g.dy) > 4) {
+          didDrag.current = true;
+        }
+        updateScene(
+          dragStart.current.x + g.dx,
+          dragStart.current.y + g.dy
+        );
+      },
 
-          // Horizontal movement gives the wide 180-degree scan.
-          // A smaller amount of vertical movement keeps aiming natural.
-          y: dragStartScene.current.y + gesture.dy * 0.45,
-        });
+      onPanResponderRelease: () => {
+        if (!didDrag.current) {
+          if (zoomRef.current === 1) {
+            enterAimed();
+          } else {
+            returnToOverview();
+          }
+        }
       },
     })
   ).current;
 
-  if (mode === "finished") {
+  const shoot = () => {
+    if (zoomRef.current === 1) return;
+
+    const { w, h } = getSize();
+    const aimX = (SCREEN_W / 2 - scene.current.x) / w;
+    const aimY = (SCREEN_H / 2 - scene.current.y) / h;
+
+    const hit = pints.find((p) => {
+      if (p.hit) return false;
+      const dx = (p.x - aimX) * w;
+      const dy = (p.y - aimY) * h;
+      return Math.sqrt(dx * dx + dy * dy) < HIT_RADIUS * zoomRef.current;
+    });
+
+    setFlash(true);
+    setTimeout(() => setFlash(false), 100);
+
+    if (!hit) return;
+
+    setPints((curr) =>
+      curr.map((p) => (p.id === hit.id ? { ...p, hit: true } : p))
+    );
+    setScore((s) => s + 1);
+
+    setTimeout(() => {
+      setPints((curr) => {
+        const remaining = curr.filter((p) => p.id !== hit.id);
+        if (remaining.length === 0) setFinished(true);
+        return remaining;
+      });
+    }, 600);
+  };
+
+  const restart = () => {
+    setPints(makePints());
+    setScore(0);
+    setFinished(false);
+    zoomRef.current = 1;
+    setMode("overview");
+    scene.current = {
+      x: SCREEN_W / 2 - BASE_W / 2,
+      y: SCREEN_H / 2 - BASE_H * 0.60,
+    };
+    forceRender((n) => n + 1);
+  };
+
+  if (finished) {
     return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "#071722",
-          justifyContent: "center",
-          alignItems: "center",
-          padding: 24,
-        }}
-      >
-        <Text
-          style={{
-            color: "white",
-            fontSize: 38,
-            fontWeight: "900",
-            marginBottom: 14,
-          }}
-        >
-          All Cleared
-        </Text>
-
-        <Text
-          style={{
-            color: "white",
-            fontSize: 24,
-            fontWeight: "800",
-            marginBottom: 28,
-          }}
-        >
-          Score: {score}
-        </Text>
-
-        <TouchableOpacity
-          onPress={restartGame}
-          style={{
-            backgroundColor: "#00A99D",
-            borderRadius: 20,
-            paddingVertical: 15,
-            paddingHorizontal: 30,
-          }}
-        >
-          <Text
-            style={{
-              color: "white",
-              fontSize: 20,
-              fontWeight: "900",
-            }}
-          >
-            PLAY AGAIN
-          </Text>
+      <View style={styles.finished}>
+        <Text style={styles.finishedTitle}>All Cleared</Text>
+        <Text style={styles.finishedScore}>Score: {score}</Text>
+        <TouchableOpacity style={styles.playAgain} onPress={restart}>
+          <Text style={styles.playAgainText}>PLAY AGAIN</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  if (mode === "overview") {
-    return (
-      <Pressable
-        onPress={(event) => {
-          const tapX = event.nativeEvent.locationX;
-          const tapY = event.nativeEvent.locationY;
-
-          const normalisedX = clamp(tapX / OVERVIEW_WIDTH, 0, 1);
-          const normalisedY = clamp(
-            (tapY - OVERVIEW_TOP) / OVERVIEW_HEIGHT,
-            0,
-            1
-          );
-
-          setSelectedPoint({
-            x: normalisedX,
-            y: normalisedY,
-          });
-        }}
-        style={{
-          flex: 1,
-          backgroundColor: "#8DC7E8",
-          overflow: "hidden",
-        }}
-      >
-        <Image
-          source={require("../assets/images/bar.png")}
-          style={{
-            position: "absolute",
-            width: OVERVIEW_WIDTH,
-            height: OVERVIEW_HEIGHT,
-            left: 0,
-            top: OVERVIEW_TOP,
-            resizeMode: "contain",
-          }}
-        />
-
-        {pints.map((pint) => (
-          <Image
-            key={pint.id}
-            source={
-              pint.hit
-                ? require("../assets/images/pint2.png")
-                : require("../assets/images/pint.png")
-            }
-            style={{
-              position: "absolute",
-              width: OVERVIEW_PINT_WIDTH,
-              height: OVERVIEW_PINT_HEIGHT,
-              left:
-                pint.x * OVERVIEW_WIDTH -
-                OVERVIEW_PINT_WIDTH / 2,
-              top:
-                OVERVIEW_TOP +
-                pint.y * OVERVIEW_HEIGHT -
-                OVERVIEW_PINT_HEIGHT / 2,
-            }}
-          />
-        ))}
-
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            left: selectedPoint.x * OVERVIEW_WIDTH - 28,
-            top:
-              OVERVIEW_TOP +
-              selectedPoint.y * OVERVIEW_HEIGHT -
-              28,
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-            borderWidth: 4,
-            borderColor: "white",
-            backgroundColor: "rgba(0,0,0,0.12)",
-          }}
-        />
-
-        <View
-          style={{
-            position: "absolute",
-            top: 34,
-            left: 22,
-            backgroundColor: "rgba(0,0,0,0.62)",
-            borderRadius: 16,
-            paddingVertical: 9,
-            paddingHorizontal: 14,
-          }}
-        >
-          <Text
-            style={{
-              color: "white",
-              fontSize: 19,
-              fontWeight: "900",
-            }}
-          >
-            Score: {score}
-          </Text>
-        </View>
-
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            left: 20,
-            right: 20,
-            bottom: 126,
-            backgroundColor: "rgba(0,0,0,0.58)",
-            borderRadius: 16,
-            padding: 12,
-          }}
-        >
-          <Text
-            style={{
-              color: "white",
-              fontSize: 16,
-              fontWeight: "800",
-              textAlign: "center",
-            }}
-          >
-            Tap an area of the town, then press AIM.
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          onPress={enterAimMode}
-          style={{
-            position: "absolute",
-            right: 24,
-            bottom: 28,
-            width: 108,
-            height: 76,
-            borderRadius: 22,
-            backgroundColor: "#F2994A",
-            justifyContent: "center",
-            alignItems: "center",
-            borderWidth: 3,
-            borderColor: "white",
-          }}
-        >
-          <Text
-            style={{
-              color: "white",
-              fontSize: 22,
-              fontWeight: "900",
-            }}
-          >
-            AIM
-          </Text>
-        </TouchableOpacity>
-      </Pressable>
-    );
-  }
+  const { w: SCENE_W, h: SCENE_H } = getSize();
+  const scopeLeft = SCREEN_W / 2 - SCOPE_SIZE / 2;
+  const scopeTop = SCREEN_H / 2 - SCOPE_SIZE / 2;
 
   return (
-    <View
-      {...panResponder.panHandlers}
-      style={{
-        flex: 1,
-        backgroundColor: "black",
-        overflow: "hidden",
-      }}
-    >
+    <View style={styles.container} {...panResponder.panHandlers}>
       <Image
         source={require("../assets/images/bar.png")}
         style={{
           position: "absolute",
-          width: AIM_SCENE_WIDTH,
-          height: AIM_SCENE_HEIGHT,
-          left: scene.x,
-          top: scene.y,
-          resizeMode: "cover",
+          width: SCENE_W,
+          height: SCENE_H,
+          left: scene.current.x,
+          top: scene.current.y,
         }}
+        resizeMode="cover"
       />
 
-      {pints.map((pint) => (
+      {pints.map((p) => (
         <Image
-          key={pint.id}
+          key={p.id}
           source={
-            pint.hit
+            p.hit
               ? require("../assets/images/pint2.png")
               : require("../assets/images/pint.png")
           }
           style={{
             position: "absolute",
-            width: PINT_WIDTH,
-            height: PINT_HEIGHT,
-            left:
-              scene.x +
-              pint.x * AIM_SCENE_WIDTH -
-              PINT_WIDTH / 2,
-            top:
-              scene.y +
-              pint.y * AIM_SCENE_HEIGHT -
-              PINT_HEIGHT / 2,
+            width: PINT_W * zoomRef.current,
+            height: PINT_H * zoomRef.current,
+            left: scene.current.x + p.x * SCENE_W - (PINT_W * zoomRef.current) / 2,
+            top: scene.current.y + p.y * SCENE_H - (PINT_H * zoomRef.current) / 2,
+            opacity: p.hit ? 0.35 : 1,
           }}
         />
       ))}
 
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          width: screen.width,
-          height: screen.height,
-          backgroundColor: "rgba(0,0,0,0.62)",
-        }}
-      />
+      {mode === "aimed" && (
+        <>
+          <View style={styles.darkOverlay} pointerEvents="none" />
 
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          width: SCOPE_SIZE,
-          height: SCOPE_SIZE,
-          left: screen.width / 2 - SCOPE_SIZE / 2,
-          top: screen.height / 2 - SCOPE_SIZE / 2,
-          borderRadius: SCOPE_SIZE / 2,
-          overflow: "hidden",
-          borderWidth: 9,
-          borderColor: "black",
-          backgroundColor: "black",
-        }}
-      >
-        <Image
-          source={require("../assets/images/bar.png")}
-          style={{
-            position: "absolute",
-            width: AIM_SCENE_WIDTH,
-            height: AIM_SCENE_HEIGHT,
-            left:
-              scene.x -
-              (screen.width / 2 - SCOPE_SIZE / 2),
-            top:
-              scene.y -
-              (screen.height / 2 - SCOPE_SIZE / 2),
-            resizeMode: "cover",
-          }}
-        />
-
-        {pints.map((pint) => (
-          <Image
-            key={pint.id}
-            source={
-              pint.hit
-                ? require("../assets/images/pint2.png")
-                : require("../assets/images/pint.png")
-            }
+          <View
             style={{
               position: "absolute",
-              width: PINT_WIDTH,
-              height: PINT_HEIGHT,
-              left:
-                scene.x +
-                pint.x * AIM_SCENE_WIDTH -
-                PINT_WIDTH / 2 -
-                (screen.width / 2 - SCOPE_SIZE / 2),
-              top:
-                scene.y +
-                pint.y * AIM_SCENE_HEIGHT -
-                PINT_HEIGHT / 2 -
-                (screen.height / 2 - SCOPE_SIZE / 2),
+              left: scopeLeft,
+              top: scopeTop,
+              width: SCOPE_SIZE,
+              height: SCOPE_SIZE,
+              borderRadius: SCOPE_SIZE / 2,
+              overflow: "hidden",
+              borderWidth: 7,
+              borderColor: "#111",
+            }}
+          >
+            <Image
+              source={require("../assets/images/bar.png")}
+              style={{
+                position: "absolute",
+                width: SCENE_W,
+                height: SCENE_H,
+                left: scene.current.x - scopeLeft,
+                top: scene.current.y - scopeTop,
+              }}
+              resizeMode="cover"
+            />
+
+            {pints.map((p) => (
+              <Image
+                key={`scope-${p.id}`}
+                source={
+                  p.hit
+                    ? require("../assets/images/pint2.png")
+                    : require("../assets/images/pint.png")
+                }
+                style={{
+                  position: "absolute",
+                  width: PINT_W * zoomRef.current,
+                  height: PINT_H * zoomRef.current,
+                  left:
+                    scene.current.x +
+                    p.x * SCENE_W -
+                    (PINT_W * zoomRef.current) / 2 -
+                    scopeLeft,
+                  top:
+                    scene.current.y +
+                    p.y * SCENE_H -
+                    (PINT_H * zoomRef.current) / 2 -
+                    scopeTop,
+                  opacity: p.hit ? 0.35 : 1,
+                }}
+              />
+            ))}
+          </View>
+
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              left: SCREEN_W / 2 - 1,
+              top: scopeTop + 16,
+              width: 2,
+              height: SCOPE_SIZE - 32,
+              backgroundColor: "#111",
             }}
           />
-        ))}
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: SCREEN_H / 2 - 1,
+              left: scopeLeft + 16,
+              width: SCOPE_SIZE - 32,
+              height: 2,
+              backgroundColor: "#111",
+            }}
+          />
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              left: SCREEN_W / 2 - 4,
+              top: SCREEN_H / 2 - 4,
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: "#111",
+            }}
+          />
+        </>
+      )}
 
-        <View
-          style={{
-            position: "absolute",
-            left: SCOPE_SIZE / 2 - 1,
-            top: 0,
-            width: 2,
-            height: SCOPE_SIZE,
-            backgroundColor: "black",
-          }}
-        />
+      {flash && <View style={styles.flash} pointerEvents="none" />}
 
-        <View
-          style={{
-            position: "absolute",
-            top: SCOPE_SIZE / 2 - 1,
-            left: 0,
-            width: SCOPE_SIZE,
-            height: 2,
-            backgroundColor: "black",
-          }}
-        />
-
-        <View
-          style={{
-            position: "absolute",
-            left: SCOPE_SIZE / 2 - 6,
-            top: SCOPE_SIZE / 2 - 6,
-            width: 12,
-            height: 12,
-            borderRadius: 6,
-            backgroundColor: "black",
-          }}
-        />
-      </View>
-
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: 34,
-          left: 22,
-          backgroundColor: "rgba(0,0,0,0.68)",
-          borderRadius: 16,
-          paddingVertical: 9,
-          paddingHorizontal: 14,
-        }}
-      >
-        <Text
-          style={{
-            color: "white",
-            fontSize: 19,
-            fontWeight: "900",
-          }}
-        >
-          Score: {score}
+      <View style={styles.scoreBox}>
+        <Text style={styles.scoreText}>Score: {score}</Text>
+        <Text style={styles.remainingText}>
+          {pints.filter((p) => !p.hit).length} left
         </Text>
       </View>
 
-      <Text
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          left: 20,
-          right: 20,
-          bottom: 142,
-          color: "white",
-          fontSize: 16,
-          fontWeight: "800",
-          textAlign: "center",
-        }}
-      >
-        Swipe left and right to scan the full panorama.
+      <Text style={styles.hint}>
+        {mode === "overview"
+          ? "Drag to look around · Tap to aim"
+          : "Drag to fine-tune · Tap to go back · Shoot"}
       </Text>
 
-      <TouchableOpacity
-        onPress={returnToOverview}
-        style={{
-          position: "absolute",
-          left: 22,
-          bottom: 30,
-          width: 112,
-          height: 64,
-          borderRadius: 18,
-          backgroundColor: "rgba(255,255,255,0.16)",
-          justifyContent: "center",
-          alignItems: "center",
-          borderWidth: 2,
-          borderColor: "white",
-        }}
-      >
-        <Text
-          style={{
-            color: "white",
-            fontSize: 16,
-            fontWeight: "900",
-          }}
-        >
-          OVERVIEW
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={shoot}
-        style={{
-          position: "absolute",
-          right: 22,
-          bottom: 22,
-          width: 96,
-          height: 96,
-          borderRadius: 48,
-          backgroundColor: "rgba(180,0,0,0.95)",
-          justifyContent: "center",
-          alignItems: "center",
-          borderWidth: 4,
-          borderColor: "white",
-        }}
-      >
-        <Text
-          style={{
-            color: "white",
-            fontSize: 18,
-            fontWeight: "900",
-          }}
-        >
-          SHOOT
-        </Text>
-      </TouchableOpacity>
+      {mode === "aimed" && (
+        <TouchableOpacity style={styles.shootBtn} onPress={shoot}>
+          <Text style={styles.shootText}>SHOOT</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+    overflow: "hidden",
+  },
+  darkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  flash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+  scoreBox: {
+    position: "absolute",
+    top: 42,
+    left: 20,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  scoreText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  remainingText: {
+    color: "#00A99D",
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  hint: {
+    position: "absolute",
+    bottom: 130,
+    left: 20,
+    right: 20,
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 15,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  shootBtn: {
+    position: "absolute",
+    right: 24,
+    bottom: 36,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: "#B00000",
+    borderWidth: 4,
+    borderColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  shootText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  finished: {
+    flex: 1,
+    backgroundColor: "#071722",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  finishedTitle: {
+    color: "#fff",
+    fontSize: 36,
+    fontWeight: "900",
+    marginBottom: 12,
+  },
+  finishedScore: {
+    color: "#00A99D",
+    fontSize: 24,
+    fontWeight: "800",
+    marginBottom: 32,
+  },
+  playAgain: {
+    backgroundColor: "#00A99D",
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+  },
+  playAgainText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+});

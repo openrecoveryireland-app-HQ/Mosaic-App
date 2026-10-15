@@ -1,3 +1,5 @@
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { useState } from "react";
 import {
   Alert,
@@ -9,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { MosaicSupportPage } from "../components/MosaicSupportPage";
 
 type MeetingLink = {
   name: string;
@@ -18,16 +21,18 @@ type MeetingLink = {
 };
 
 type SectionName =
-  | "local"
-  | "online"
-  | "special"
-  | "languages"
+  | "alcohol"
+  | "gambling"
+  | "cannabis"
+  | "cocaine"
+  | "heroin"
+  | "sexlove"
   | "wellbeing";
 
 const SOCIAL_PRESCRIBING_URL =
   "https://www.allirelandsocialprescribing.ie/service-list-by-county";
 
-const localMeetingLinks: MeetingLink[] = [
+const alcoholLocal: MeetingLink[] = [
   {
     name: "AA Meetings",
     description: "Alcoholics Anonymous Ireland meeting finder.",
@@ -35,14 +40,8 @@ const localMeetingLinks: MeetingLink[] = [
     colour: "#1F9BBF",
   },
   {
-    name: "NA Meetings",
-    description: "Narcotics Anonymous Ireland meetings.",
-    url: "https://www.na-ireland.org/na-meetings/",
-    colour: "#177F69",
-  },
-  {
     name: "LifeRing Meetings",
-    description: "LifeRing Ireland online recovery meetings.",
+    description: "LifeRing Ireland recovery meetings.",
     url: "https://lifering.ie/online-meetings-schedule/",
     colour: "#96358B",
   },
@@ -54,18 +53,12 @@ const localMeetingLinks: MeetingLink[] = [
   },
 ];
 
-const onlineMeetingLinks: MeetingLink[] = [
+const alcoholOnline: MeetingLink[] = [
   {
     name: "Live Online AA Meetings",
     description: "AA Online Intergroup live online meeting directory.",
     url: "https://aa-intergroup.org/meetings/",
     colour: "#1F9BBF",
-  },
-  {
-    name: "Online NA Meetings",
-    description: "Virtual NA online and phone meetings.",
-    url: "https://virtual-na.org/meetings/",
-    colour: "#177F69",
   },
   {
     name: "LifeRing Online Meetings",
@@ -75,288 +68,432 @@ const onlineMeetingLinks: MeetingLink[] = [
   },
   {
     name: "SMART Recovery Online",
-    description: "SMART Recovery Ireland online meetings.",
-    url: "https://smartrecovery.ie/online-meetings/",
+    description: "SMART Recovery online meeting options.",
+    url: "https://smartrecovery.ie/find-a-meeting/",
     colour: "#D66926",
   },
 ];
 
-const specialistMeetingLinks: MeetingLink[] = [
+const alcoholWomen: MeetingLink[] = [
   {
-    name: "LGBTQ+ AA Online",
-    description: "AA Online Intergroup LGBTQ+ meeting example.",
-    url: "https://aa-intergroup.org/meetings/angel-lgbtq-online-meeting/",
-    colour: "#96358B",
+    name: "Women-only AA meetings",
+    description: "Use the AA Ireland finder and look for women-only meetings near you.",
+    url: "https://www.alcoholicsanonymous.ie/find-meeting/",
+    colour: "#C76E27",
   },
   {
-    name: "Women’s AA Online",
-    description: "AA Online Intergroup women’s meeting example.",
-    url: "https://aa-intergroup.org/meetings/better-together-womens-group/",
-    colour: "#96358B",
+    name: "Online women-focused AA options",
+    description: "Search AA Online Intergroup for women / women’s meetings.",
+    url: "https://aa-intergroup.org/meetings/",
+    colour: "#D66926",
   },
+];
+
+const alcoholMen: MeetingLink[] = [
   {
-    name: "Men’s AA Online",
-    description: "AA Online Intergroup men’s meeting example.",
-    url: "https://aa-intergroup.org/meetings/boyz-ii-men-daily-fellowship/",
+    name: "Men-only AA meetings",
+    description: "Use the AA Ireland finder and look for men-only meetings near you.",
+    url: "https://www.alcoholicsanonymous.ie/find-meeting/",
     colour: "#1F9BBF",
   },
   {
-    name: "Young People’s AA Online",
-    description: "AA Online Intergroup young people’s meeting example.",
-    url: "https://aa-intergroup.org/meetings/a-new-wave-young-peoples-group-4/",
-    colour: "#D66926",
+    name: "Online men-focused AA options",
+    description: "Search AA Online Intergroup for men / men’s meetings.",
+    url: "https://aa-intergroup.org/meetings/",
+    colour: "#123C69",
   },
 ];
 
-const languageMeetingLinks: MeetingLink[] = [
+const alcoholSpecial: MeetingLink[] = [
   {
-    name: "AA Online Intergroup",
-    description:
-      "International online AA directory with meetings in different languages.",
+    name: "LGBTQ+ AA Ireland",
+    description: "LGBTQ+ Alcoholics Anonymous meetings in Ireland.",
+    url: "https://lgbtaaireland.com/index.php/lgbt-aa-meetings/",
+    colour: "#96358B",
+  },
+  {
+    name: "Outhouse LGBTQ+ Centre",
+    description: "AA, NA and recovery groups at Outhouse, Dublin.",
+    url: "https://outhouse.ie/health-wellness/",
+    colour: "#9B51E0",
+  },
+  {
+    name: "Kindr (GBTQ+ men's recovery)",
+    description: "GBTQ+ men's 12-step recovery group.",
+    url: "https://www.kindr.ie/",
+    colour: "#1F9BBF",
+  },
+  {
+    name: "IREYPAA — Young People in AA",
+    description: "All-Ireland Young People in Alcoholics Anonymous.",
+    url: "https://ireypaa.org/",
+    colour: "#D66926",
+  },
+  {
+    name: "Belong To (LGBTQ+ youth)",
+    description: "Ireland’s national LGBTQ+ youth organisation — including drug & alcohol support.",
+    url: "https://www.belongto.org/",
+    colour: "#177F69",
+  },
+];
+
+const alcoholLanguages: MeetingLink[] = [
+  {
+    name: "AA Meetings in Other Languages",
+    description: "Find AA meetings by language via AA Online Intergroup.",
     url: "https://aa-intergroup.org/meetings/",
     colour: "#1F9BBF",
   },
   {
-    name: "Spanish AA Online",
-    description: "Spanish-speaking AA online meeting example.",
-    url: "https://aa-intergroup.org/meetings/aa-en-espaol-6/",
-    colour: "#D66926",
-  },
-  {
-    name: "Polish AA Meetings",
-    description: "Polish-speaking AA meetings through AA Great Britain.",
-    url: "https://www.alcoholics-anonymous.org.uk/intergroups/polish-speaking-meetings/",
-    colour: "#96358B",
-  },
-  {
-    name: "French AA Online",
-    description: "Online AA meetings connected with AA Paris.",
-    url: "https://www.aaparis.org/meetings/?type=online",
-    colour: "#96358B",
-  },
-  {
-    name: "AA Spain",
-    description: "Official Alcoholics Anonymous Spain website.",
-    url: "https://www.alcoholicos-anonimos.org/",
+    name: "NA Multilingual / Online",
+    description: "NA meetings including online and wider language options.",
+    url: "https://www.na-ireland.org/na-meetings/",
     colour: "#177F69",
   },
   {
-    name: "AA Around the World",
-    description:
-      "AA world directory for finding AA support in other countries and languages.",
-    url: "https://www.aa.org/aa-around-the-world",
-    colour: "#123C69",
+    name: "SMART Recovery",
+    description: "Ask SMART about language or accessibility needs.",
+    url: "https://smartrecovery.ie/find-a-meeting/",
+    colour: "#D66926",
+  },
+];
+
+const gamblingLinks: MeetingLink[] = [
+  {
+    name: "Gamblers Anonymous Ireland",
+    description: "GA Ireland meetings and support.",
+    url: "https://www.gamblersanonymous.ie/",
+    colour: "#377D1B",
+  },
+  {
+    name: "GA Online Meetings (UK & Ireland list)",
+    description: "Online GA meetings including LGBTQ+-preferred and women-preferred options.",
+    url: "https://gamblersanonymous.org.uk/online-meetings",
+    colour: "#96358B",
+  },
+];
+
+const cannabisLinks: MeetingLink[] = [
+  {
+    name: "NA Meetings (Ireland)",
+    description: "Narcotics Anonymous Ireland — covers cannabis and other drugs.",
+    url: "https://www.na-ireland.org/na-meetings/",
+    colour: "#177F69",
+  },
+  {
+    name: "SMART Recovery",
+    description: "SMART Recovery Ireland meeting finder.",
+    url: "https://smartrecovery.ie/find-a-meeting/",
+    colour: "#D66926",
+  },
+  {
+    name: "NA World — find online meetings",
+    description: "Search worldwide NA meetings, including virtual, LGBTQ and young people where listed.",
+    url: "https://www.na.org",
+    colour: "#1F9BBF",
+  },
+];
+
+const cocaineLinks: MeetingLink[] = [
+  {
+    name: "Cocaine Anonymous Ireland",
+    description: "CA Ireland fellowship and meeting information.",
+    url: "https://www.caireland.info/",
+    colour: "#1F9BBF",
+  },
+  {
+    name: "NA Meetings (Ireland)",
+    description: "Narcotics Anonymous Ireland meetings.",
+    url: "https://www.na-ireland.org/na-meetings/",
+    colour: "#177F69",
+  },
+  {
+    name: "CA Online meetings",
+    description: "Cocaine Anonymous online meeting directory.",
+    url: "https://ca-online.org",
+    colour: "#D66926",
+  },
+  {
+    name: "CAUK meeting finder (online & special interest)",
+    description: "UK/online CA list — includes women, LGBTQ and other tagged meetings.",
+    url: "https://meetings.cocaineanonymous.org.uk/locations",
+    colour: "#96358B",
+  },
+];
+
+const heroinLinks: MeetingLink[] = [
+  {
+    name: "NA Meetings (Ireland)",
+    description: "Narcotics Anonymous Ireland meetings.",
+    url: "https://www.na-ireland.org/na-meetings/",
+    colour: "#177F69",
+  },
+  {
+    name: "NA at Outhouse (Dublin)",
+    description: "NA meeting hosted at Outhouse LGBTQ+ Centre.",
+    url: "https://outhouse.ie/health-wellness/",
+    colour: "#9B51E0",
+  },
+  {
+    name: "NA World — find online meetings",
+    description: "Search worldwide NA meetings, including virtual and special-interest where listed.",
+    url: "https://www.na.org",
+    colour: "#1F9BBF",
+  },
+];
+
+const sexLoveLinks: MeetingLink[] = [
+  {
+    name: "SLAA Ireland",
+    description: "Sex and Love Addicts Anonymous Ireland.",
+    url: "https://slaaireland.org/",
+    colour: "#96358B",
+  },
+  {
+    name: "Sexaholics Anonymous Ireland",
+    description: "SA Ireland meetings information.",
+    url: "https://saireland.com/meetings/",
+    colour: "#D66926",
+  },
+  {
+    name: "SLAA Virtual Intergroup",
+    description: "Worldwide online SLAA meetings — includes LGBTQIA and other special-interest meetings.",
+    url: "https://slaavirtual.org/meetings/calendar/",
+    colour: "#9B51E0",
   },
 ];
 
 function openLink(url: string) {
   Linking.openURL(url).catch(() => {
-    Alert.alert("Could not open link", "Please try again.");
+    Alert.alert("Could not open link", "Check your connection and try again.");
   });
-}
-
-function showMeetingInfo(name: string) {
-  Alert.alert(
-    name,
-    "This opens the official page in your browser.\n\nYou are not joining a meeting by pressing this button.\n\nYou can read the details first and then choose what feels right for you."
-  );
-}
-
-function showSocialPrescribingInfo() {
-  Alert.alert(
-    "What is Social Prescribing?",
-    "Social Prescribing helps connect people with local activities, groups, services, and community supports that may improve wellbeing.\n\nThis might include walking groups, art, music, education, volunteering, hobbies, peer support, social groups, or other local services.\n\nIt is not a medical treatment. It is a way of finding positive things in your area that can help you feel less isolated, more connected, and more supported.\n\nYou can contact a local Social Prescribing service yourself, or ask a GP, health worker, or support worker to refer you."
-  );
-}
-
-function SectionDropdown({
-  title,
-  description,
-  section,
-  openSection,
-  onToggle,
-  children,
-}: {
-  title: string;
-  description: string;
-  section: SectionName;
-  openSection: SectionName | null;
-  onToggle: (section: SectionName) => void;
-  children: React.ReactNode;
-}) {
-  const open = openSection === section;
-
-  return (
-    <View style={styles.sectionBox}>
-      <TouchableOpacity
-        style={styles.sectionHeader}
-        onPress={() => onToggle(section)}
-      >
-        <View style={{ flex: 1 }}>
-          <Text style={styles.sectionTitle}>{title}</Text>
-          <Text style={styles.sectionDescription}>{description}</Text>
-        </View>
-
-        <Text style={styles.arrow}>{open ? "▲" : "▼"}</Text>
-      </TouchableOpacity>
-
-      {open && <View style={styles.sectionContent}>{children}</View>}
-    </View>
-  );
 }
 
 function LinkCard({ item }: { item: MeetingLink }) {
   return (
     <View style={[styles.linkCard, { borderColor: item.colour }]}>
-      <Text style={styles.linkTitle}>{item.name}</Text>
-      <Text style={styles.linkText}>{item.description}</Text>
+      <Text style={styles.linkName}>{item.name}</Text>
+      <Text style={styles.linkDescription}>{item.description}</Text>
+      <TouchableOpacity
+        onPress={() => openLink(item.url)}
+        style={[styles.mainButton, { backgroundColor: item.colour }]}
+      >
+        <Text style={styles.mainButtonText}>Open</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
-      <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={[styles.mainButton, { backgroundColor: item.colour }]}
-          onPress={() => openLink(item.url)}
-        >
-          <Text style={styles.mainButtonText}>Official Page</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.infoButton, { borderColor: item.colour }]}
-          onPress={() => showMeetingInfo(item.name)}
-        >
-          <Text style={styles.infoButtonText}>Info</Text>
-        </TouchableOpacity>
-      </View>
+function Section({
+  title,
+  colour,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  colour: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.sectionWrap}>
+      <TouchableOpacity
+        onPress={onToggle}
+        style={[styles.sectionHeader, { borderColor: colour, backgroundColor: colour }]}
+      >
+        <Text style={styles.sectionHeaderText}>{title}</Text>
+        <Text style={styles.sectionHeaderText}>{open ? "▲" : "▼"}</Text>
+      </TouchableOpacity>
+      {open && <View style={styles.sectionBody}>{children}</View>}
     </View>
   );
 }
 
 export default function Meetings() {
-  const [openSection, setOpenSection] = useState<SectionName | null>("local");
+  const [openSection, setOpenSection] = useState<SectionName | null>(null);
+  const [showWhy, setShowWhy] = useState(false);
+  const [showMosaicSupport, setShowMosaicSupport] = useState(false);
 
-  function toggleSection(section: SectionName) {
+  function toggle(section: SectionName) {
     setOpenSection((current) => (current === section ? null : section));
   }
 
   return (
     <ImageBackground
       source={require("../assets/images/backg.png")}
-      style={styles.background}
+      style={{ flex: 1 }}
       resizeMode="cover"
     >
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Find Support</Text>
+      <ScrollView contentContainerStyle={styles.content}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={22} color="#123C69" />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
 
+        <Text style={styles.title}>Find a Meeting</Text>
         <Text style={styles.subtitle}>
-          Meetings, online support, community links, and wellbeing options.
+          Ireland meetings plus online options worldwide.
         </Text>
 
-        <SectionDropdown
-          title="Find Your Local Meeting"
-          description="AA, NA, LifeRing, and SMART Recovery meeting finders."
-          section="local"
-          openSection={openSection}
-          onToggle={toggleSection}
+        <Section
+          title="Alcohol"
+          colour="#1F9BBF"
+          open={openSection === "alcohol"}
+          onToggle={() => toggle("alcohol")}
         >
-          {localMeetingLinks.map((item) => (
+          <Text style={styles.subHeading}>Local / Ireland</Text>
+          {alcoholLocal.map((item) => (
             <LinkCard key={item.name} item={item} />
           ))}
-        </SectionDropdown>
 
-        <SectionDropdown
-          title="Live Online Meetings"
-          description="Online meetings you can read about before joining."
-          section="online"
-          openSection={openSection}
-          onToggle={toggleSection}
-        >
-          {onlineMeetingLinks.map((item) => (
+          <Text style={styles.subHeading}>Online</Text>
+          {alcoholOnline.map((item) => (
             <LinkCard key={item.name} item={item} />
           ))}
-        </SectionDropdown>
 
-        <SectionDropdown
-          title="Special Interest Meetings"
-          description="Meetings such as LGBTQ+, women’s, men’s, and young people’s meetings."
-          section="special"
-          openSection={openSection}
-          onToggle={toggleSection}
-        >
-          {specialistMeetingLinks.map((item) => (
+          <Text style={styles.subHeading}>Women only</Text>
+          {alcoholWomen.map((item) => (
             <LinkCard key={item.name} item={item} />
           ))}
-        </SectionDropdown>
 
-        <SectionDropdown
-          title="Meetings in Other Languages"
-          description="International directories and language-specific meeting links."
-          section="languages"
-          openSection={openSection}
-          onToggle={toggleSection}
-        >
-          {languageMeetingLinks.map((item) => (
+          <Text style={styles.subHeading}>Men only</Text>
+          {alcoholMen.map((item) => (
             <LinkCard key={item.name} item={item} />
           ))}
-        </SectionDropdown>
 
-        <SectionDropdown
-          title="Wellbeing & Community Support"
-          description="Non-meeting supports that may help with connection, routine, and wellbeing."
-          section="wellbeing"
-          openSection={openSection}
-          onToggle={toggleSection}
+          <Text style={styles.subHeading}>LGBTQ+ & Young People</Text>
+          {alcoholSpecial.map((item) => (
+            <LinkCard key={item.name} item={item} />
+          ))}
+
+          <Text style={styles.subHeading}>Languages</Text>
+          {alcoholLanguages.map((item) => (
+            <LinkCard key={item.name} item={item} />
+          ))}
+        </Section>
+
+        <Section
+          title="Gambling"
+          colour="#377D1B"
+          open={openSection === "gambling"}
+          onToggle={() => toggle("gambling")}
+        >
+          {gamblingLinks.map((item) => (
+            <LinkCard key={item.name} item={item} />
+          ))}
+        </Section>
+
+        <Section
+          title="Cannabis"
+          colour="#177F69"
+          open={openSection === "cannabis"}
+          onToggle={() => toggle("cannabis")}
+        >
+          {cannabisLinks.map((item) => (
+            <LinkCard key={item.name} item={item} />
+          ))}
+        </Section>
+
+        <Section
+          title="Cocaine"
+          colour="#D66926"
+          open={openSection === "cocaine"}
+          onToggle={() => toggle("cocaine")}
+        >
+          {cocaineLinks.map((item) => (
+            <LinkCard key={item.name} item={item} />
+          ))}
+        </Section>
+
+        <Section
+          title="Heroin & Other Drugs"
+          colour="#96358B"
+          open={openSection === "heroin"}
+          onToggle={() => toggle("heroin")}
+        >
+          {heroinLinks.map((item) => (
+            <LinkCard key={item.name} item={item} />
+          ))}
+        </Section>
+
+        <Section
+          title="Sex & Love Addiction"
+          colour="#9B51E0"
+          open={openSection === "sexlove"}
+          onToggle={() => toggle("sexlove")}
+        >
+          {sexLoveLinks.map((item) => (
+            <LinkCard key={item.name} item={item} />
+          ))}
+        </Section>
+
+        <Section
+          title="Wellbeing & Community"
+          colour="#177F69"
+          open={openSection === "wellbeing"}
+          onToggle={() => toggle("wellbeing")}
         >
           <View style={styles.wellbeingCard}>
-            <Text style={styles.linkTitle}>Social Prescribing</Text>
-
-            <Text style={styles.linkText}>
-              Find local activities, groups, services, and community supports in
-              your area.
-            </Text>
-
             <TouchableOpacity
-              style={styles.socialInfoButton}
-              onPress={showSocialPrescribingInfo}
-            >
-              <Text style={styles.socialButtonText}>
-                What is Social Prescribing?
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.socialMainButton}
               onPress={() => openLink(SOCIAL_PRESCRIBING_URL)}
+              style={styles.socialMainButton}
             >
-              <Text style={styles.socialButtonText}>
-                Find Social Prescribing Near Me
-              </Text>
+              <Text style={styles.socialButtonText}>Social Prescribing (Ireland)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowMosaicSupport(true)}
+              style={styles.socialInfoButton}
+            >
+              <Text style={styles.socialButtonText}>Mosaic Support Page</Text>
             </TouchableOpacity>
           </View>
-        </SectionDropdown>
+        </Section>
 
-        <View style={styles.bottomBox}>
-          <Text style={styles.bottomTitle}>Why more than one option?</Text>
-
-          <Text style={styles.bottomText}>
-            Recovery is not one-size-fits-all. Mosaic links to different support
-            options so people can choose what suits them best.
-          </Text>
+        <View style={{ width: "100%", alignItems: "center", marginTop: 12 }}>
+          <TouchableOpacity
+            onPress={() => setShowWhy((c) => !c)}
+            style={styles.smallFooterButton}
+          >
+            <Text style={styles.smallFooterButtonText}>
+              Why more than one option? {showWhy ? "▲" : "▼"}
+            </Text>
+          </TouchableOpacity>
+          {showWhy && (
+            <View style={styles.whyBox}>
+              <Text style={styles.whyText}>
+                Different people need different rooms. AA, LifeRing, SMART, NA,
+                CA and others each have their own approach. Online meetings mean
+                you can also join specialist rooms worldwide. Use what helps you.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
+      <MosaicSupportPage page={showMosaicSupport ? "support" : null} onClose={() => setShowMosaicSupport(false)} />
     </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  background: {
-    flex: 1,
+  content: {
+    padding: 24,
+    paddingTop: 50,
+    paddingBottom: 90,
   },
-
-  container: {
-    padding: 22,
-    paddingTop: 48,
-    paddingBottom: 85,
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    alignSelf: "flex-start",
   },
-
+  backText: {
+    color: "#123C69",
+    fontSize: 16,
+    fontWeight: "800",
+    marginLeft: 2,
+  },
   title: {
     color: "#123C69",
     fontSize: 34,
@@ -364,171 +501,124 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 8,
   },
-
   subtitle: {
     color: "#263238",
     fontSize: 16,
     textAlign: "center",
-    lineHeight: 23,
-    marginBottom: 20,
-    fontWeight: "700",
-  },
-
-  sectionBox: {
-    backgroundColor: "rgba(255,255,255,0.9)",
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: "rgba(18,60,105,0.35)",
-    marginBottom: 14,
-    overflow: "hidden",
-  },
-
-  sectionHeader: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  sectionTitle: {
-    color: "#123C69",
-    fontSize: 20,
-    fontWeight: "900",
-    marginBottom: 4,
-  },
-
-  sectionDescription: {
-    color: "#263238",
-    fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 24,
+    marginBottom: 22,
     fontWeight: "600",
   },
-
-  arrow: {
-    color: "#123C69",
-    fontSize: 22,
+  sectionWrap: {
+    marginBottom: 12,
+  },
+  sectionHeader: {
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 2,
+  },
+  sectionHeaderText: {
+    color: "#ffffff",
+    fontSize: 17,
     fontWeight: "900",
-    marginLeft: 12,
   },
-
-  sectionContent: {
-    padding: 14,
-    paddingTop: 0,
+  sectionBody: {
+    marginTop: 10,
   },
-
+  subHeading: {
+    color: "#123C69",
+    fontSize: 16,
+    fontWeight: "800",
+    marginBottom: 8,
+    marginTop: 10,
+  },
   linkCard: {
-    backgroundColor: "rgba(255,255,255,0.96)",
+    backgroundColor: "rgba(255,255,255,0.94)",
     borderRadius: 18,
     padding: 14,
     borderWidth: 2,
-    marginTop: 12,
+    marginBottom: 10,
   },
-
-  linkTitle: {
+  linkName: {
     color: "#123C69",
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "900",
-    textAlign: "center",
-    marginBottom: 6,
+    marginBottom: 4,
   },
-
-  linkText: {
+  linkDescription: {
     color: "#263238",
     fontSize: 14,
     lineHeight: 20,
-    textAlign: "center",
+    marginBottom: 10,
     fontWeight: "600",
-    marginBottom: 12,
   },
-
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-
   mainButton: {
-    width: "60%",
-    borderRadius: 16,
-    paddingVertical: 12,
+    borderRadius: 14,
+    paddingVertical: 11,
     alignItems: "center",
   },
-
   mainButtonText: {
     color: "#ffffff",
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "900",
-    textAlign: "center",
   },
-
-  infoButton: {
-    width: "36%",
-    backgroundColor: "#ffffff",
-    borderWidth: 2,
-    borderRadius: 16,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-
-  infoButtonText: {
-    color: "#123C69",
-    fontSize: 14,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-
   wellbeingCard: {
     backgroundColor: "rgba(255,255,255,0.96)",
     borderRadius: 18,
     padding: 16,
     borderWidth: 2,
     borderColor: "#177F69",
-    marginTop: 12,
   },
-
   socialInfoButton: {
     backgroundColor: "#123C69",
     borderRadius: 16,
     paddingVertical: 13,
     alignItems: "center",
-    marginBottom: 10,
+    marginTop: 10,
   },
-
   socialMainButton: {
     backgroundColor: "#177F69",
     borderRadius: 16,
     paddingVertical: 13,
     alignItems: "center",
   },
-
   socialButtonText: {
     color: "#ffffff",
     fontSize: 15,
     fontWeight: "900",
     textAlign: "center",
   },
-
-  bottomBox: {
-    backgroundColor: "rgba(255,255,255,0.86)",
-    borderRadius: 22,
-    padding: 18,
+  smallFooterButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(18,60,105,0.25)",
-    marginTop: 6,
+    borderColor: "#177F69",
+    backgroundColor: "rgba(255, 255, 255, 0.75)",
+    alignSelf: "center",
   },
-
-  bottomTitle: {
-    color: "#123C69",
-    fontSize: 20,
-    fontWeight: "900",
-    textAlign: "center",
-    marginBottom: 8,
+  smallFooterButtonText: {
+    color: "#177F69",
+    fontSize: 13,
+    fontWeight: "700",
   },
-
-  bottomText: {
-    color: "#263238",
+  whyBox: {
+    width: "100%",
+    marginTop: 10,
+    backgroundColor: "rgba(255,255,255,0.78)",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(18,60,105,0.2)",
+  },
+  whyText: {
+    color: "#111111",
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 23,
     textAlign: "center",
-    fontWeight: "600",
   },
 });
